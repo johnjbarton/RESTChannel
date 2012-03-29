@@ -1,0 +1,34 @@
+<html>
+<head>
+<script src="../RESTChannel.js"></script>
+<script>
+// Google BSD license http://code.google.com/google_bsd_license.html
+// Copyright 2011 Google Inc. johnjbarton@google.com
+
+
+/*globals RESTChannel window console */
+
+console.log(window.location + ' listening ');
+
+var connection = new RESTChannel.Connection();
+connection.onAttach = function() {
+  console.log(window.location + ' attach');
+  this.putObject('hello', {message:'I am your parent'});
+};
+
+  
+var onUnload = RESTChannel.listen(connection);
+window.addEventListener('unload', onUnload);
+
+
+window.addEventListener('load', function() {
+  console.log(window.location.toString() + ' load ');
+});
+
+
+</script>
+</head>
+<body>
+<iframe class='RESTChannelClient' src="sameDomainIframe.html"></iframe>
+</body>
+</html>
