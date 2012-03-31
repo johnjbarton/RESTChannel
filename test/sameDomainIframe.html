@@ -9,11 +9,31 @@
 /*globals RESTChannel window console */
 
 window.addEventListener('load', function() {
+
   console.log(window.location.toString() + ' load ');
+
   var connection = new RESTChannel.Connection();
+
   connection.onAttach = function() {
     console.log(window.location + ' attach');
-    this.putObject('hello', {message:'I am your child'});
+
+    connection.register('hello', {
+        put: function (obj) {
+          return {message:'hey'};
+        }
+      }
+    );
+
+    this.putObject( 
+      'hello', 
+      {message:'I am your child'},
+      function(reply) {
+        console.log("Child hears: "+reply.message, reply);
+      },
+      function(err) {
+        console.error("Child recvd err", err);
+      }
+    );
   };
 
   console.log(window.location + ' talking ');

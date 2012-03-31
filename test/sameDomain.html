@@ -13,8 +13,26 @@ console.log(window.location + ' listening ');
 var connection = new RESTChannel.Connection();
 
 connection.onAttach = function() {
+
   console.log(window.location + ' attach');
-  this.putObject('hello', {message:'I am your parent'});
+  
+  connection.register('hello', {
+      put: function (obj) {
+        return {message:'Did you do your homework?'};
+      }
+    }
+  );
+  
+  this.putObject(
+    'hello', 
+    {message:'I am your parent'},
+    function(reply) {
+      console.log("Parent hears: "+reply.message, reply);
+    },
+    function(err) {
+      console.error("Parent recvd err", err);
+    }
+  );
 };
 
   

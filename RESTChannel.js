@@ -8,15 +8,21 @@
 
 window.RESTChannel = (function() {
 
+  var debug = false;
+
   var msgNumber = 0;
   var pending = {};
 
   function Connection() {
-    this.sent = 0;
+    this.registry = {};
   }
   
   Connection.prototype = {
+  
     serial: function(onOk, onErr) {
+      if (!onOk || !onErr) {
+        throw new Error("RESTChannel Connection: No response or error handler");
+      }
       var serial = ++msgNumber;
       pending[serial] = {
         ok: onOk,
@@ -32,6 +38,10 @@ window.RESTChannel = (function() {
     
     onAttach: function() {
       console.error('Not implemented');
+    },
+    
+    close: function() {
+      this.port.close(); 
     },
     
     // Commands to remote 
@@ -66,21 +76,34 @@ window.RESTChannel = (function() {
       this.port.postMessage({
           method: 'DELETE', 
           url: url,
-          body: obj,
-          serial: serial(onOk, onErr)
+          serial: this.serial(onOk, onErr)
       });
     },
     
-    // Command from remote
-    onGet: function(url) {
-      this.putObject('response/'+url, {status: '501 Not Implemented'});
+    respond: function(serial, obj) {
+      this.port.postMessage({
+          method: 'REPLY',
+          url: '/',
+          status: 200,
+          serial: serial,
+          body: obj
+      });
     },
-    onPut: function(url, body) {
-      this.putObject('response/'+url, {status: '501 Not Implemented'});
+    
+    // Commands from remote
+    //
+    register: function(url, handler) {
+      this.registry[url] = handler;
     },
-    onPost: function(url, body) {
-      this.putObject('response/'+url, {status: '501 Not Implemented'});
+    
+    dispatch: function(msgObj) {
+      var service = this.registry[msgObj.url];
+      var method = msgObj.method.toLowerCase();
+      if (service && (method in service) ) {
+        return service[method](msgObj.body);
+      }
     }
+
   };
 
   function RESTChannel(port, connection) {
@@ -91,7 +114,7 @@ window.RESTChannel = (function() {
   }
 
   var methods = [
-    'response',
+    'REPLY',
     'GET',
     'PUT',
     'POST',
@@ -103,16 +126,17 @@ window.RESTChannel = (function() {
     _badRequest: function(obj) {
       obj.status = 400;
       obj.reason = 'Bad Request';
-      this.connection.putObject('response', obj); 
+      this.connection.respond(obj);
+      this.connection.close(); // you had your chance, you blew it.
     },
     
     _notImplemented: function(obj) {
       obj.status = 501;
       obj.reason = "Not Implemented";
-      this.connection.putObject('response', obj);
+      this.connection.respond(obj);
     },
     
-    _preReply: function(obj) {
+    _envelop: function(obj) {
       return {
         url: obj.url,
         method: obj.method,
@@ -121,19 +145,19 @@ window.RESTChannel = (function() {
     },
   
     _onmessage: function(event) {
-      console.log('recv: ', event);
-      debugger;
       
       var msgObj = this._validate(event);
-      console.log('recv: ', msgObj);
-      
+      if (debug) {
+        console.log('recv: ', msgObj);
+      }
+     
       if (msgObj) {
-        if (msgObj.url === 'response') {
+        if (msgObj.method === 'REPLY') {
           var callbacks = pending[msgObj.serial]; 
           if (callbacks) {
             var status = msgObj.status;
             if (status >= 200 && status < 300 && callbacks.ok) {
-              callbacks.ok(msgObj);
+              callbacks.ok(msgObj.body, msgObj);
             } else if (callbacks.err) {
               callbacks.err(msgObj);
             } else {
@@ -143,9 +167,13 @@ window.RESTChannel = (function() {
             console.error("RESTChannel response but no pending message", msgObj);
           }
         } else {
-          var reply = this._preReply(msgObj);
-          reply.response = this._dispatch(msgObj);
-          this.connection.putObject('response', reply);
+          var envelop = this._envelop(msgObj);
+          var response = this.connection.dispatch(msgObj);
+          if (response) {
+            this.connection.respond(envelop.serial, response);
+          } else {
+            return this._notImplemented(envelop);
+          }
         }
       }
     },
@@ -158,41 +186,36 @@ window.RESTChannel = (function() {
       if (!msgObj) {
         return this._badRequest({message: 'No event.data'}); 
       } 
-      var serial = msgObj.serial; 
-      if (!serial) {
-        return this._badRequest({message: 'No serial number'}); 
-      } 
-      var url = msgObj.url;
-      if (!url) {
-        return this._badRequest({message: 'No URL', serial: serial}); 
-      }
-      var method = msgObj.url; 
+      var method = msgObj.method; 
       if (!method || methods.indexOf(method) === -1) {
         return this._badRequest({
             message: 'Unknown Method', 
             method: method, 
-            url: url, 
-            serial: serial
+            url: msgObj.url, 
+            serial: msgObj.serial
         });
       }
-      console.log('dispatch '+msgObj, msgObj);
-      return msgObj;
-    },
-    
-    _dispatch: function(msgObj) {
-      var service = this.lookup(msgObj.url);
-      var method = msgObj.method;
-      if (!service || ! (method in service) ) {
-        return this._notImplemented(msgObj);
+      var serial = msgObj.serial; 
+      if (!serial && method !== 'REPLY') {
+        return this._badRequest({message: 'No serial number'}); 
+      } 
+      var url = msgObj.url;
+      if (!url && method !== 'REPLY') {
+        return this._badRequest({message: 'No URL', serial: serial}); 
       }
-      return service[method](msgObj.body);
+      if (debug) {
+        console.log(msgObj.serial+' valid '+msgObj.method+' '+msgObj.url, msgObj);
+      }
+      return msgObj;
     }
     
   };
 
   function accept(connection, event) {
     if (event.data && event.data === "RESTChannel") {
-      console.log(window.location + " RESTChannel accept ", event);
+      if (debug) {
+        console.log(window.location + " RESTChannel accept ", event);
+      }
       var port = event.ports[0];
       return new RESTChannel(port, connection);
     } // else not for us
@@ -209,7 +232,9 @@ window.RESTChannel = (function() {
   function talk(listenerWindow, connection) {
     var channel = new window.MessageChannel();
     channel.onmessage = accept.bind(null, connection);
-    console.log('talk post');
+    if (debug) {
+      console.log('talk post');
+    }
     listenerWindow.postMessage('RESTChannel', '*', [channel.port2]);
     return new RESTChannel(channel.port1, connection);
   }
