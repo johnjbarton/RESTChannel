@@ -11,6 +11,7 @@
 console.log(window.location + ' listening ');
 
 var connection = new RESTChannel.Connection();
+
 connection.onAttach = function() {
   console.log(window.location + ' attach');
   this.putObject('hello', {message:'I am your parent'});
