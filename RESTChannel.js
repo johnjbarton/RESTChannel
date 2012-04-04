@@ -31,13 +31,8 @@ window.RESTChannel = (function() {
       return serial;
     },
   
-    attach: function(port) {
+    attach: function(port, onAttach) {
       this.port = port;
-      this.onAttach();
-    },
-    
-    onAttach: function() {
-      console.error('Not implemented');
     },
     
     close: function() {
@@ -211,32 +206,34 @@ window.RESTChannel = (function() {
     
   };
 
-  function accept(connection, event) {
+  function accept(connection, onAttach, event) {
     if (event.data && event.data === "RESTChannel") {
       if (debug) {
         console.log(window.location + " RESTChannel accept ", event);
       }
       var port = event.ports[0];
-      return new RESTChannel(port, connection);
+      onAttach( new RESTChannel(port, connection) );
     } // else not for us
   }
 
-  function listen(connection) {
-    var onIntroduction = accept.bind(null, connection);
+  function listen(connection, onAttach) {
+    var onIntroduction = accept.bind(null, connection, onAttach);
     window.addEventListener('message', onIntroduction);
-    return function() {
+    return function dispose() {
       window.removeEventListener('message', onIntroduction);
     };
   }
   
-  function talk(listenerWindow, connection) {
+  function talk(listenerWindow, connection, onAttach) {
     var channel = new window.MessageChannel();
-    channel.onmessage = accept.bind(null, connection);
     if (debug) {
       console.log('talk post');
     }
     listenerWindow.postMessage('RESTChannel', '*', [channel.port2]);
-    return new RESTChannel(channel.port1, connection);
+    onAttach( new RESTChannel(channel.port1, connection) );
+    return function dispose() {
+      channel.port1.close();
+    };
   }
   
   return {

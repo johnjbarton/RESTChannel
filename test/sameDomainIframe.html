@@ -14,7 +14,7 @@ window.addEventListener('load', function() {
 
   var connection = new RESTChannel.Connection();
 
-  connection.onAttach = function() {
+  function onAttach() {
     console.log(window.location + ' attach');
 
     connection.register('hello', {
@@ -24,7 +24,7 @@ window.addEventListener('load', function() {
       }
     );
 
-    this.putObject( 
+    connection.putObject( 
       'hello', 
       {message:'I am your child'},
       function(reply) {
@@ -34,11 +34,11 @@ window.addEventListener('load', function() {
         console.error("Child recvd err", err);
       }
     );
-  };
+  }
 
   console.log(window.location + ' talking ');
 
-  RESTChannel.talk(window.parent, connection);
+  RESTChannel.talk(window.parent, connection, onAttach);
 });
 
 
