@@ -1,0 +1,137 @@
+<html>
+<head>
+<script src="../RESTChannel.js"></script>
+<script>
+// Google BSD license http://code.google.com/google_bsd_license.html
+// Copyright 2011 Google Inc. johnjbarton@google.com
+
+
+/*globals RESTChannel window console */
+
+console.log(window.location + ' listening ');
+
+var connection = new RESTChannel.Connection();
+
+function cloneOwn(obj) {
+  var result = {};
+  Object.keys(obj).forEach(function(prop) {
+    result[prop] = obj[prop];
+  });
+}
+
+function fnf() {
+  console.log('Fired and forgetting: ', arguments);
+}
+
+var Mouse = {
+  enter: function() {
+  
+    // Private Impl
+    
+    var listeners = [];
+    
+    var testElement = document.querySelector('.testElement');
+    testElement.addEventListener(
+      'mouseover', 
+      function eventDelegator(event) {
+        console.log('parent ', event);
+        var jsonEvent = cloneOwn(event);
+        listeners.forEach(function(listener) {
+          var body = listener.body;
+          listener.connection.postObject(
+            body.url,   // callback addr
+            {
+              event: jsonEvent  // Should not send all of this...
+            },
+            fnf
+          );
+        });
+      }
+    );
+    
+    // check that the remote side gave us an addr to fire events at
+    function validate(body) {
+      return body.url;
+    }
+    
+    // Public API (generic event dispatch) 
+    var MouseEnter = {
+    
+      get: function(connection) {
+        listeners.some(function(listener) {
+          if (listener.connection === connection) {
+            return listener.body;
+          }
+        });
+      },
+      
+      put: function (connection, body) {
+        if ( validate(body) ) {
+          listeners.push({
+            body: body, 
+            connection: connection
+          });
+          return {totalListeners: listeners.length};
+        } else {
+          return {error: "URL required"};
+        }
+      },
+      
+      'delete': function(connection, obj) {
+        var found = -1;
+        listeners.some(function(listener, index) {
+          if (listener.connection === connection) {
+            found = index;
+            return true;
+          }
+        });
+        if (found !== -1) {
+          listeners.splice(found, 1);
+        }
+      }
+    };
+    
+    return MouseEnter;
+  }
+};
+
+function onAttach() {
+
+  console.log(window.location + ' attach');
+
+  var MouseEnter= Mouse.enter(); // a servlet-like module
+  
+  connection.register('mouse.over', MouseEnter);
+    
+  connection.optionsObject(
+    '*', 
+    function(reply) {
+      console.log("Parent finds options: ", reply);
+    },
+    function(err) {
+      console.error("Parent recvd err", err);
+    }
+  );
+}
+
+var onUnload = RESTChannel.listen(connection, onAttach);
+window.addEventListener('unload', onUnload);
+
+window.addEventListener('load', function() {
+  console.log(window.location.toString() + ' load ');
+});
+
+
+</script>
+<style>
+.testElement {
+  background-color: #DFFF95;
+}
+</style>
+</head>
+<body>
+<p>Open the debugging console to see the conversation logged</p>
+<iframe class='RESTChannelClient' src="eventChild.html"></iframe>
+<p class='testElement'>Move your mouse over this element to fire the events</p>
+</body>
+</html>

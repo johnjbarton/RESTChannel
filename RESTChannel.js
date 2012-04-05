@@ -20,7 +20,7 @@ window.RESTChannel = (function() {
   Connection.prototype = {
   
     serial: function(onOk, onErr) {
-      if (!onOk || !onErr) {
+      if (!onOk && !onErr) {
         throw new Error("RESTChannel Connection: No response or error handler");
       }
       var serial = ++msgNumber;
@@ -112,13 +112,16 @@ window.RESTChannel = (function() {
     //
     register: function(url, handler) {
       this.registry[url] = handler;
+      // return a 'reference' to this handler
+      return {url: url};
     },
     
     dispatch: function(msgObj) {
       var method = msgObj.method.toLowerCase();
       var service = this.registry[msgObj.url];
       if (service && (method in service) ) {
-        return service[method](msgObj.body);
+        // Call service with the connection and the object sent (if any).
+        return service[method](this, msgObj.body);
       } else {
         if (method === 'options') {
           return this.options(msgObj);
@@ -148,14 +151,14 @@ window.RESTChannel = (function() {
     _badRequest: function(obj) {
       obj.status = 400;
       obj.reason = 'Bad Request';
-      this.connection.respond(obj);
+      this.connection.respond(null, obj);
       this.connection.close(); // you had your chance, you blew it.
     },
     
-    _notImplemented: function(obj) {
+    _notImplemented: function(serial, obj) {
       obj.status = 501;
       obj.reason = "Not Implemented";
-      this.connection.respond(obj);
+      this.connection.respond(serial, obj);
     },
     
     _envelop: function(obj) {
@@ -194,7 +197,7 @@ window.RESTChannel = (function() {
           if (response) {
             this.connection.respond(envelop.serial, response);
           } else {
-            return this._notImplemented(envelop);
+            return this._notImplemented(envelop.serial, envelop);
           }
         }
       }
