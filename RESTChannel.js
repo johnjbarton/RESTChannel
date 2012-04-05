@@ -41,6 +41,14 @@ window.RESTChannel = (function() {
     
     // Commands to remote 
     //
+    optionsObject: function(url, onOk, onErr) {
+      this.port.postMessage({
+          method: 'OPTIONS', 
+          url: url, 
+          serial: this.serial(onOk, onErr)
+      });
+    },
+    
     getObject: function(url, onOk, onErr) {
       this.port.postMessage({
           method: 'GET', 
@@ -85,6 +93,21 @@ window.RESTChannel = (function() {
       });
     },
     
+    // System 'options', either all registered URLs or all methods at a URL
+    options: function(obj) {
+      var service = this.registry[obj.url];
+      if (service) {
+        var keys = [];
+        do {
+          keys = keys.concat( Object.keys(service) );
+          service = Object.getPrototypeOf(service);
+        } while(service !== Object.prototype);
+        return keys;
+      } else {
+        return Object.keys(this.registry);
+      }
+    },
+    
     // Commands from remote
     //
     register: function(url, handler) {
@@ -92,13 +115,16 @@ window.RESTChannel = (function() {
     },
     
     dispatch: function(msgObj) {
-      var service = this.registry[msgObj.url];
       var method = msgObj.method.toLowerCase();
+      var service = this.registry[msgObj.url];
       if (service && (method in service) ) {
         return service[method](msgObj.body);
+      } else {
+        if (method === 'options') {
+          return this.options(msgObj);
+        }
       }
     }
-
   };
 
   function RESTChannel(port, connection) {
@@ -110,6 +136,7 @@ window.RESTChannel = (function() {
 
   var methods = [
     'REPLY',
+    'OPTIONS', 
     'GET',
     'PUT',
     'POST',

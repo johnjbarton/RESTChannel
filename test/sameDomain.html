@@ -33,6 +33,16 @@ function onAttach() {
       console.error("Parent recvd err", err);
     }
   );
+  
+  connection.optionsObject(
+    '*', 
+    function(reply) {
+      console.log("Parent finds options: ", reply);
+    },
+    function(err) {
+      console.error("Parent recvd err", err);
+    }
+  );
 }
 
 var onUnload = RESTChannel.listen(connection, onAttach);

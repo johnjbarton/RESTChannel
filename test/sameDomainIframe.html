@@ -24,16 +24,43 @@ window.addEventListener('load', function() {
       }
     );
 
+    function childErr(err) {
+      console.error("Child recvd err", err);
+    }
+
     connection.putObject( 
       'hello', 
       {message:'I am your child'},
       function(reply) {
         console.log("Child hears: "+reply.message, reply);
       },
+      childErr
+    );
+    
+    function getMethods(urls) {
+      urls.forEach(function(url) {
+        connection.optionsObject(
+          url,
+          function(reply) {
+            console.log('Child finds ' + url +' has ', reply);
+          },
+          childErr
+        );
+      });
+    }
+    
+    connection.optionsObject(
+      '*', 
+      function(reply) {
+        console.log("Child finds options: ", reply);
+        getMethods(reply);
+      },
       function(err) {
-        console.error("Child recvd err", err);
+        console.error("Parent recvd err", err);
       }
     );
+
+
   }
 
   console.log(window.location + ' talking ');
