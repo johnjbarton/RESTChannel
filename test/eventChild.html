@@ -25,7 +25,7 @@ window.addEventListener('load', function() {
       'mouse.overed',     // URL for handler
       {
         // handle event
-        post: function (obj) {
+        post: function (connection, obj) {
           console.log("eventChild got event: ", obj);
           return {message:'hey'};
         }
@@ -46,6 +46,8 @@ window.addEventListener('load', function() {
       },        
       childErr                      // or fail
     );
+    
+    //connection.addEventListener('mouse.over', handler);
     
   }
 
