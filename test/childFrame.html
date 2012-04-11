@@ -83,7 +83,11 @@ window.addEventListener('load', function() {
 
   console.log(window.location + ' talking ');
 
-  RESTChannel.talk(window.parent, onAttach);
+  var disposer =  RESTChannel.talk(window.parent, onAttach);
+  window.addEventListener('unload', function unload() {
+    disposer();
+    window.removeEventListener('unload', unload);
+  });
 });
 
 
