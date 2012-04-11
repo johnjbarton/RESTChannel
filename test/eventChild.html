@@ -12,9 +12,7 @@ window.addEventListener('load', function() {
 
   console.log(window.location.toString() + ' load ');
 
-  var connection = new RESTChannel.Connection();
-
-  function onAttach() {
+  function onAttach(connection) {
     
     console.log(window.location + ' attach');
 
@@ -53,7 +51,7 @@ window.addEventListener('load', function() {
 
   console.log(window.location + ' talking ');
 
-  RESTChannel.talk(window.parent, connection, onAttach);
+  RESTChannel.talk(window.parent, onAttach);
 });
 
 
