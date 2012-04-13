@@ -34,7 +34,7 @@ window.RESTChannel = (function() {
   
     serial: function(onOk, onErr) {
       if (!onOk && !onErr) {
-        throw new Error("RESTChannel Connection: No response or error callbacks");
+        throw new Error("RESTChannel Connection: No response or error handler");
       }
       var serial = ++msgNumber;
       pending[serial] = {
@@ -96,11 +96,12 @@ window.RESTChannel = (function() {
       });
     },
     
-    respond: function(serial, obj) {
+    respond: function(serial, obj, status) {
+      status = status || 200;
       this.port.postMessage({
           method: 'REPLY',
           url: '/',
-          status: 200,
+          status: status,
           serial: serial,
           body: obj
       });
@@ -123,9 +124,9 @@ window.RESTChannel = (function() {
     
     // Commands from remote
     //
-    register: function(url, service) {
-      this.registry[url] = service;
-      // return a 'reference' to this service
+    register: function(url, handler) {
+      this.registry[url] = handler;
+      // return a 'reference' to this handler
       return {url: url};
     },
     
@@ -143,16 +144,14 @@ window.RESTChannel = (function() {
     },
 
     _badRequest: function(obj) {
-      obj.status = 400;
       obj.reason = 'Bad Request';
-      this.respond(null, obj);
+      this.respond(null, obj, 400);
       this.close(); // you had your chance, you blew it.
     },
     
     _notImplemented: function(serial, obj) {
-      obj.status = 501;
       obj.reason = "Not Implemented";
-      this.respond(serial, obj);
+      this.respond(serial, obj, 501);
     },
     
     _envelop: function(obj) {
