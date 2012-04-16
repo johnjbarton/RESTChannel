@@ -135,12 +135,24 @@ window.RESTChannel = (function() {
       var service = this.registry[msgObj.url];
       if (service && (method in service) ) {
         // Call service with the connection and the object sent (if any).
-        return service[method](this, msgObj.body);
+        try {
+          return service[method](this, msgObj.body) || {}
+        } catch(exc) {
+          return this._internalServerError(msgObj, exc);
+        }
       } else {
         if (method === 'options') {
           return this.options(msgObj);
         }
       }
+    },
+
+    _internalServerError: function(msgObj, exc) {
+      var errInfo = {
+        message: exc.toString(),
+        stack: exc.stack 
+      };
+      this.respond(msgObj.serial, errInfo, 500);
     },
 
     _badRequest: function(obj) {
@@ -265,3 +277,4 @@ window.RESTChannel = (function() {
   };
 
 }());
+
